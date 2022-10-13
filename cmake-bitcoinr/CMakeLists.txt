@@ -1,0 +1,67 @@
+
+IF(WIN32)
+	ADD_DEFINITIONS(-D__WXMSW__)
+ENDIF(WIN32)
+
+# omit buffer security checkes, increases hashing speed, only available with >= MSVC2005
+IF(MSVC80 OR MSVC90 OR MSVC10)
+	ADD_DEFINITIONS(/GS-)
+ENDIF(MSVC80 OR MSVC90 OR MSVC10)
+
+IF(BITCOIN_4WAYSSE2)
+	ADD_DEFINITIONS(-DFOURWAYSSE2)
+	IF(MSVC)
+		ADD_DEFINITIONS(/arch:SSE2)
+	ENDIF(MSVC)
+ENDIF(BITCOIN_4WAYSSE2)
+
+SET(BITCOIN_REMOTE_MINER_SRC
+	${CMAKE_SOURCE_DIR}/src/remoteminermain.cpp
+	${CMAKE_SOURCE_DIR}/src/cryptopp/cpu.cpp
+	${CMAKE_SOURCE_DIR}/src/cryptopp/sha.cpp
+	${CMAKE_SOURCE_DIR}/src/json/json_spirit_reader.cpp
+	${CMAKE_SOURCE_DIR}/src/json/json_spirit_value.cpp
+	${CMAKE_SOURCE_DIR}/src/json/json_spirit_writer.cpp
+	${CMAKE_SOURCE_DIR}/src/minercommon/base64.c
+	${CMAKE_SOURCE_DIR}/src/remote/remoteminerclient.cpp
+	${CMAKE_SOURCE_DIR}/src/remote/remoteminermessage.cpp
+	${CMAKE_SOURCE_DIR}/src/remote/remoteminerthreadcpu.cpp
+)
+
+SET(BITCOIN_REMOTE_MINER_CUDA_SRC
+	${CMAKE_SOURCE_DIR}/src/remote/remoteminerthreadgpu.cpp
+	${CMAKE_SOURCE_DIR}/src/remote/cuda/bitcoinminercuda.cpp
+	${CMAKE_SOURCE_DIR}/src/remote/cuda/bitcoinminercuda.cu
+)
+
+SET(BITCOIN_REMOTE_MINER_OPENCL_SRC
+	${CMAKE_SOURCE_DIR}/src/remote/remoteminerthreadgpu.cpp
+	${CMAKE_SOURCE_DIR}/src/remote/opencl/bitcoinmineropencl.cpp
+)
+
+IF(BITCOIN_ENABLE_CUDA)
+	ADD_DEFINITIONS(-D_BITCOIN_MINER_CUDA_)
+	CUDA_ADD_EXECUTABLE(bitcoinr WIN32 ${BITCOIN_REMOTE_MINER_SRC} ${BITCOIN_REMOTE_MINER_CUDA_SRC})
+ELSE(BITCOIN_ENABLE_CUDA)
+	IF(BITCOIN_ENABLE_OPENCL)
+		ADD_DEFINITIONS(-D_BITCOIN_MINER_OPENCL_)
+		ADD_EXECUTABLE(bitcoinr ${BITCOIN_REMOTE_MINER_SRC} ${BITCOIN_REMOTE_MINER_OPENCL_SRC})
+	ELSE(BITCOIN_ENABLE_OPENCL)
+		ADD_EXECUTABLE(bitcoinr ${BITCOIN_REMOTE_MINER_SRC})
+	ENDIF(BITCOIN_ENABLE_OPENCL)
+ENDIF(BITCOIN_ENABLE_CUDA)
+
+TARGET_LINK_LIBRARIES(bitcoinr ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES})
+IF(WIN32)
+	TARGET_LINK_LIBRARIES(bitcoinr winmm.lib shlwapi.lib)
+ELSE(WIN32)
+	TARGET_LINK_LIBRARIES(bitcoinr pthread)
+ENDIF(WIN32)
+
+IF(BITCOIN_ENABLE_CUDA)
+	TARGET_LINK_LIBRARIES(bitcoinr ${CUDA_LIBRARIES})
+ENDIF(BITCOIN_ENABLE_CUDA)
+
+IF(BITCOIN_ENABLE_OPENCL)
+	TARGET_LINK_LIBRARIES(bitcoinr ${OPENCL_LIBRARY})
+ENDIF(BITCOIN_ENABLE_OPENCL)
